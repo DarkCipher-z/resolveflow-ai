@@ -16,6 +16,8 @@ import {
   formatDisputeReason,
   formatDisputeStatus,
   formatLifecycleStage,
+  formatDateIST,
+  formatTimeIST,
 } from '@/lib/dispute-helpers';
 
 const filterTabs = [
@@ -219,10 +221,10 @@ export default function DisputeInboxPage() {
                         {dispute.seller_response_due_at ? (
                           <div>
                             <span className="text-foreground font-medium">
-                              {new Date(dispute.seller_response_due_at).toLocaleDateString()}
+                              {formatDateIST(dispute.seller_response_due_at)}
                             </span>
                             <span className="block text-[10px] text-secondary">
-                              {new Date(dispute.seller_response_due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {formatTimeIST(dispute.seller_response_due_at)}
                             </span>
                           </div>
                         ) : (
@@ -248,7 +250,7 @@ export default function DisputeInboxPage() {
                       </td>
                       <td className="py-3.5 px-4 text-secondary text-[11px]">
                         {dispute.last_synced_at
-                          ? new Date(dispute.last_synced_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          ? formatTimeIST(dispute.last_synced_at)
                           : '—'}
                       </td>
                       <td className="py-3.5 px-4 text-right">

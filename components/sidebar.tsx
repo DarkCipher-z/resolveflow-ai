@@ -67,7 +67,7 @@ export function Sidebar() {
             <p className="text-xs font-medium text-white truncate">Northstar Goods</p>
           </div>
           <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-            DEMO
+            Single-merchant mode
           </span>
         </div>
       </div>
@@ -115,7 +115,7 @@ export function Sidebar() {
       <div className="p-4 border-t border-sidebar-border bg-[#0d162a]/60 text-[11px] text-sidebar-muted">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>PayPal Sandbox Live</span>
+          <span>PayPal Sandbox</span>
         </div>
       </div>
     </aside>

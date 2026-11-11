@@ -37,7 +37,7 @@ export function Topbar() {
         </div>
 
         <span className="text-xs text-secondary hidden md:inline">
-          Account: <strong className="text-foreground">ResolveFlow AI US (Business)</strong>
+          App: <strong className="text-foreground">ResolveFlow AI US</strong>
         </span>
       </div>
 

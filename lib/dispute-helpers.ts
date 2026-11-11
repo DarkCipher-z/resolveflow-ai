@@ -80,3 +80,46 @@ export function formatDisputeStatus(status?: string | null): string {
   };
   return mapping[status] ?? status.replace(/_/g, ' ');
 }
+
+export const MERCHANT_TZ = 'Asia/Kolkata';
+export const MERCHANT_TZ_LABEL = 'IST';
+
+/**
+ * Formats a date-time string in merchant timezone (Asia/Kolkata / IST)
+ */
+export function formatDateTimeIST(dateStr?: string | Date | null): string {
+  if (!dateStr) return 'Not available';
+  const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+  if (isNaN(d.getTime())) return 'Not available';
+  return `${d.toLocaleString('en-IN', {
+    timeZone: MERCHANT_TZ,
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })} ${MERCHANT_TZ_LABEL}`;
+}
+
+export function formatDateIST(dateStr?: string | Date | null): string {
+  if (!dateStr) return 'Not available';
+  const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+  if (isNaN(d.getTime())) return 'Not available';
+  return d.toLocaleDateString('en-IN', {
+    timeZone: MERCHANT_TZ,
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+export function formatTimeIST(dateStr?: string | Date | null): string {
+  if (!dateStr) return '';
+  const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+  if (isNaN(d.getTime())) return '';
+  return `${d.toLocaleTimeString('en-IN', {
+    timeZone: MERCHANT_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+  })} ${MERCHANT_TZ_LABEL}`;
+}

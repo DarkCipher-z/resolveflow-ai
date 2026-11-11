@@ -17,6 +17,8 @@ import {
   formatDisputeReason,
   formatDisputeStatus,
   formatLifecycleStage,
+  formatDateIST,
+  formatTimeIST,
 } from '@/lib/dispute-helpers';
 
 export default function OverviewPage() {
@@ -279,10 +281,10 @@ export default function OverviewPage() {
                         {dispute.seller_response_due_at ? (
                           <div>
                             <span className="text-foreground font-medium">
-                              {new Date(dispute.seller_response_due_at).toLocaleDateString()}
+                              {formatDateIST(dispute.seller_response_due_at)}
                             </span>
                             <span className="block text-[10px] text-secondary">
-                              {new Date(dispute.seller_response_due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {formatTimeIST(dispute.seller_response_due_at)}
                             </span>
                           </div>
                         ) : (
