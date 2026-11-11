@@ -1,10 +1,7 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'ResolveFlow AI — PayPal Dispute Intelligence',
@@ -18,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} min-h-screen bg-background text-foreground flex antialiased`}>
+      <body className="min-h-screen bg-background text-foreground flex antialiased">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
           <Topbar />
