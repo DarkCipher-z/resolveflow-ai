@@ -4,3 +4,7 @@
 node_modules
 .next
 *.tsbuildinfo
+
+tsconfig.tsbuildinfo
+.next
+node_modules
