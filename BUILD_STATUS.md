@@ -1,69 +1,64 @@
 # BUILD_STATUS.md — ResolveFlow AI
 
-## Current Phase: 0 — PayPal Validation
-**Status:** ✅ COMPLETE  
-**Last Updated:** 2026-11-11T13:15 IST
+## Current Phase: 1 — Core App + DB + Sync
+**Status:** 🟡 IN PROGRESS (Scaffold complete, awaiting SQL migration execution)  
+**Last Updated:** 2026-11-11T15:25 IST
 
 ---
 
-## Phase 0 Results
+## Smoke Test & PayPal Validation Findings
 
-### 1. Repo Inspection
-| Item | Value |
-|------|-------|
-| Framework | **None yet** — bare repo with spec files only |
-| Package manager | npm (package.json created during Phase 0) |
-| Entry points | None — Next.js not scaffolded yet |
-| Existing UI | None |
-| Deployment config | None |
+### 1. Allowed Response Options vs Links
+- **`allowed_response_options` (raw):**
+  ```json
+  {
+    "accept_claim": {
+      "accept_claim_types": ["PARTIAL_REFUND", "REFUND"]
+    },
+    "make_offer": {
+      "offer_types": ["REFUND"]
+    }
+  }
+  ```
+- **HATEOAS `links`:**
+  - `GET self`
+  - `POST accept_claim`
+  - `POST provide_evidence` (rel: `provide_evidence` with underscore)
+  - `POST send_message`
+  - `POST escalate`
+  - `POST make_offer`
+- **Key finding:** `provide_evidence` is present in `links` but NOT in `allowed_response_options`. The application now derives allowed actions from BOTH sources dynamically (rule 5).
 
-**Env vars present (names only):**
-| Variable | Status |
-|----------|--------|
-| PAYPAL_ENV | SET |
-| PAYPAL_CLIENT_ID | SET |
-| PAYPAL_CLIENT_SECRET | SET |
-| PAYPAL_BASE_URL | SET |
-| PAYPAL_WEBHOOK_ID | EMPTY |
-| NEXT_PUBLIC_SUPABASE_URL | SET |
-| NEXT_PUBLIC_SUPABASE_ANON_KEY | SET |
-| SUPABASE_SERVICE_ROLE_KEY | SET |
-| GEMINI_API_KEY | SET |
-| GEMINI_MODEL | SET |
-| APP_URL | SET |
-| DEFAULT_TIMEZONE | SET |
-
-**Files in repo:** `.env`, `.env.example`, `.gitignore`, `AGENTS.md`, `GEMINI.md`, `LICENSE`, `RESOLVEFLOW_SPEC.md`, `package.json`, `scripts/paypal-smoke.ts`
-
-### 2. PayPal Smoke Test Results
-```
-Token OK. expires_in: 32400, scope present: true
-Dispute-related scopes: disputes/read-buyer, disputes/update-seller, disputes/read-seller, disputes/create, documents/disputes/download
-List disputes status: 200
-Disputes found: 0
-```
-✅ Token obtained server-side  
-✅ All required dispute scopes present  
-✅ List disputes returns 200  
-⚠️ No disputes exist yet — manual Sandbox dispute creation needed
-
-### 3. Blockers
-- **PAYPAL_WEBHOOK_ID** is EMPTY. Not a blocker for Phase 0–3 but needed for Phase 4 webhooks.
-- **No Sandbox dispute exists** — must be created manually (see instructions in Phase 0 report artifact).
-- **Next.js not scaffolded** — Phase 1 will handle this.
-
-### 4. Next Steps
-- [ ] User creates a Sandbox dispute (manual buyer flow)
-- [ ] Re-run smoke test to verify dispute detail
-- [ ] Await user approval of implementation plan
-- [ ] Begin Phase 1: scaffold Next.js + DB migration + sync
+### 2. Evidence Array Analysis
+- `[0] evidence_type: CREATE`: `source: SUBMITTED_BY_BUYER` (buyer's initial filing metadata)
+- `[1] evidence_type: PROOF_OF_FULFILLMENT`: `source: REQUESTED_FROM_SELLER` (the actual requested evidence from the merchant)
+- **Docs-confirmed INR types:** `PROOF_OF_FULFILLMENT`, `PROOF_OF_DELIVERY_SIGNATURE`, `PROOF_OF_REFUND`, `PROOF_OF_RESHIPMENT`, `OTHER`
+- The sync service extracts seller requirements specifically matching `source: REQUESTED_FROM_SELLER` and maps INR defaults, discarding internal buyer tags like `CREATE`.
 
 ---
 
-## Done Log
-| When | What | Verification |
-|------|------|-------------|
-| Phase 0 | Repo inspected | File listing above |
-| Phase 0 | PayPal docs researched | API details confirmed via web search |
-| Phase 0 | Smoke test written & run | Token OK, 200, 0 disputes |
-| Phase 0 | Sandbox dispute creation instructions | Written in report |
+## Phase 1 Progress
+
+| Component | Status | Verification |
+|---|---|---|
+| Next.js App Router + TypeScript + Tailwind | ✅ Complete | `npx next build` passes (all 7 routes compiled) |
+| Design Tokens (spec Part H) | ✅ Complete | bg `#F7F9FC`, sidebar `#111C35`, primary `#2563EB` |
+| Supabase Migration `0001_init.sql` | ✅ Created | `supabase/migrations/0001_init.sql` |
+| Supabase verification script | ✅ Created | `scripts/verify-supabase.ts` |
+| Supabase client (Admin service role) | ✅ Created | `server/supabase/admin.ts` |
+| Single-merchant demo mode helper | ✅ Created | `server/supabase/seed-demo.ts` (`Northstar Goods`) |
+| PayPal API client & token cache | ✅ Created | `server/paypal/{auth,client,disputes,errors}.ts` |
+| Action derivation logic | ✅ Created | `deriveAllowedActions` in `server/paypal/disputes.ts` |
+| PayPal dispute sync engine | ✅ Created | `server/sync/disputes.ts` & `POST /api/disputes/sync` |
+| Dispute Inbox Page | ✅ Created | `app/disputes/page.tsx` |
+| Dispute Workspace Page | ✅ Created | `app/disputes/[id]/page.tsx` |
+| Operations Overview Dashboard | ✅ Created | `app/page.tsx` (4 KPIs + queue) |
+| Git cleanliness | ✅ Verified | No `.env` tracked; git working tree clean |
+
+---
+
+## Immediate Next Step
+1. **User Action:** Copy `supabase/migrations/0001_init.sql` and run it in the Supabase Dashboard SQL Editor.
+2. Run `scripts/verify-supabase.ts` to confirm 14 tables created.
+3. Run `POST /api/disputes/sync` to pull `PP-R-YYP-10198826` and `PP-R-XBK-10198832`.
+4. Launch local server and open Browser agent to capture verification screenshots.
