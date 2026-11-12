@@ -1,8 +1,8 @@
 import { PayPalAuthError } from './errors';
 
-const base = process.env.PAYPAL_BASE_URL ?? 'https://api-m.sandbox.paypal.com';
-const clientId = process.env.PAYPAL_CLIENT_ID;
-const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+const getBase = () => process.env.PAYPAL_BASE_URL ?? 'https://api-m.sandbox.paypal.com';
+const getClientId = () => process.env.PAYPAL_CLIENT_ID;
+const getClientSecret = () => process.env.PAYPAL_CLIENT_SECRET || process.env.PAYPAL_SECRET;
 
 interface CachedToken {
   accessToken: string;
@@ -22,6 +22,10 @@ export async function getPayPalAccessToken(): Promise<string> {
   if (tokenCache && tokenCache.expiresAt - now > 60_000) {
     return tokenCache.accessToken;
   }
+
+  const clientId = getClientId();
+  const clientSecret = getClientSecret();
+  const base = getBase();
 
   if (!clientId || !clientSecret) {
     throw new PayPalAuthError('PAYPAL_CLIENT_ID or PAYPAL_CLIENT_SECRET environment variable is missing');

@@ -144,6 +144,17 @@ cp .env.example .env
 npx next dev
 ```
 
+### Deployment on Render
+
+ResolveFlow AI includes a [`render.yaml`](./render.yaml) Blueprint configuration for 1-click deployment on [Render](https://render.com):
+
+1. Go to [Render Dashboard](https://dashboard.render.com) &rarr; **New +** &rarr; **Blueprint**.
+2. Connect repository `https://github.com/DarkCipher-z/resolveflow-ai`.
+3. Provide your environment keys (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`).
+4. Click **Apply**. Render will automatically build (`npm install && npm run build`) and start the production web service.
+
+Detailed instructions are available in [DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ### Usage Flow
 
 1. **Sync disputes** — click "Sync from PayPal" in the sidebar to pull disputes from Sandbox
