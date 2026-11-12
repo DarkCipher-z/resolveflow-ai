@@ -191,3 +191,11 @@ MIT
 ---
 
 *Built with ❤️ for the PayPal Disputes Hackathon — November 2026*
+
+## Known limitations
+- Single-merchant demo mode: one seeded organization and owner; real authentication and multi-tenant onboarding are future work.
+- Dispute updates use the manual "Sync Sandbox" button; PayPal webhooks are not implemented.
+- The evidence graph, analytics and AI investigator screens are not built.
+- AI output is an unverified suggestion; only human-confirmed matches can be submitted.
+- Tested only against PayPal Sandbox: evidence for an item-not-received inquiry was accepted and the case moved to WAITING_FOR_BUYER_RESPONSE.
+- Development note: the first sandbox submission (dispute PP-R-YYP-10198826) was run by the coding agent during development; the demo submission was confirmed by a person in the UI.
