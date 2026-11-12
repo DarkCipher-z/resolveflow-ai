@@ -87,6 +87,11 @@ export function EvidencePacket({ disputeId, paypalDisputeId }: EvidencePacketPro
     submissionId?: string;
   } | null>(null);
 
+  // Submissions history and dispute status from server
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [disputeStatus, setDisputeStatus] = useState<string | null>(null);
+  const [disputeStage, setDisputeStage] = useState<string | null>(null);
+
   async function loadVerifiedMatches() {
     setLoading(true);
     setError(null);
@@ -94,9 +99,12 @@ export function EvidencePacket({ disputeId, paypalDisputeId }: EvidencePacketPro
       const res = await fetch(`/api/disputes/${disputeId}/evidence-packet`);
       const json = await res.json();
       if (json.success) {
-        setVerifiedMatches(json.data.verifiedMatches);
+        setVerifiedMatches(json.data.verifiedMatches || []);
+        setSubmissions(json.data.submissions || []);
+        setDisputeStatus(json.data.disputeStatus || null);
+        setDisputeStage(json.data.disputeStage || null);
         // Pre-fill notes from verified facts only — never claim delivery
-        const autoNotes = buildSafeNotes(json.data.verifiedMatches);
+        const autoNotes = buildSafeNotes(json.data.verifiedMatches || []);
         setNotes(autoNotes);
       } else {
         setError(json.error || 'Failed to load verified evidence');
@@ -266,6 +274,67 @@ export function EvidencePacket({ disputeId, paypalDisputeId }: EvidencePacketPro
           been made. Submission requires explicit human confirmation.
         </div>
       </div>
+
+      {/* Live Submission Status Banner (if already submitted to PayPal Sandbox) */}
+      {submissions.some((s) => s.submission_status === 'SUBMITTED') && (
+        <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-xs text-green-950 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+              <span className="font-bold text-green-900">
+                Evidence Submitted to PayPal Sandbox
+              </span>
+            </div>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-200 text-green-900">
+              SUBMITTED
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] pt-1">
+            {submissions
+              .filter((s) => s.submission_status === 'SUBMITTED')
+              .map((sub) => (
+                <div key={sub.id} className="bg-white/80 p-2.5 rounded border border-green-100 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-secondary">Submitted At:</span>
+                    <span className="font-medium font-mono text-foreground">
+                      {new Date(sub.submitted_at || sub.created_at).toLocaleString('en-IN', {
+                        timeZone: 'Asia/Kolkata',
+                        hour12: true,
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })} IST
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-secondary">Submission ID:</span>
+                    <span className="font-mono text-[10px] text-secondary truncate max-w-[180px]">
+                      {sub.id}
+                    </span>
+                  </div>
+                  {sub.paypal_response?.links?.[0]?.href && (
+                    <div className="text-[10px] text-secondary pt-0.5 border-t border-slate-100">
+                      PayPal Resource:{' '}
+                      <span className="font-mono text-primary truncate">
+                        {sub.paypal_response.links[0].href.replace(/https:\/\/[^/]+/, '')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
+
+          {disputeStatus === 'WAITING_FOR_BUYER_RESPONSE' && (
+            <p className="text-[11px] text-green-800 font-medium pt-1 border-t border-green-200">
+              ✓ Authoritative PayPal State Reconciled: Dispute is now{' '}
+              <strong className="underline">WAITING_FOR_BUYER_RESPONSE</strong> in Sandbox. The seller deadline has been cleared.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Verified matches list */}
       {!hasVerified ? (
@@ -525,19 +594,28 @@ export function EvidencePacket({ disputeId, paypalDisputeId }: EvidencePacketPro
             </span>
           </div>
 
-          {/* Submit button */}
+          {/* Submit button / Submitted indicator */}
           <div className="flex items-center gap-3 pt-2 border-t border-blue-200">
-            <button
-              onClick={() => setShowConfirmModal(true)}
-              disabled={preview.warnings.some((w) => w.includes('NOT been HUMAN_VERIFIED')) || preview.attachedFiles.length === 0}
-              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Send className="w-3.5 h-3.5" />
-              Submit to PayPal Sandbox
-            </button>
-            <span className="text-[10px] text-amber-700 font-medium">
-              ⚠ This will make a real API call to PayPal Sandbox.
-            </span>
+            {disputeStatus === 'WAITING_FOR_BUYER_RESPONSE' || submissions.some((s) => s.submission_status === 'SUBMITTED') ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-green-100 text-green-800 text-xs font-semibold border border-green-200">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                <span>Evidence Successfully Submitted — Action Complete in PayPal Sandbox</span>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => setShowConfirmModal(true)}
+                  disabled={preview.warnings.some((w) => w.includes('NOT been HUMAN_VERIFIED')) || preview.attachedFiles.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Submit to PayPal Sandbox
+                </button>
+                <span className="text-[10px] text-amber-700 font-medium">
+                  ⚠ This will make a real API call to PayPal Sandbox.
+                </span>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -46,6 +46,19 @@ export async function GET(
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
+    // Also fetch submissions history and dispute status
+    const { data: submissions } = await supabaseAdmin
+      .from('evidence_submissions')
+      .select('id, submission_status, submitted_at, paypal_response, evidence_payload, created_at')
+      .eq('dispute_id', disputeId)
+      .order('created_at', { ascending: false });
+
+    const { data: disputeRow } = await supabaseAdmin
+      .from('disputes')
+      .select('status, lifecycle_stage')
+      .eq('id', disputeId)
+      .single();
+
     const verifiedMatches = (matches || []).map((m: any) => {
       const output = m.ai_runs?.output || {};
       const fields = output.extracted_fields || {};
@@ -67,7 +80,15 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ success: true, data: { verifiedMatches } });
+    return NextResponse.json({
+      success: true,
+      data: {
+        verifiedMatches,
+        submissions: submissions || [],
+        disputeStatus: disputeRow?.status,
+        disputeStage: disputeRow?.lifecycle_stage,
+      },
+    });
   } catch (err: any) {
     console.error('Evidence packet fetch error:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
