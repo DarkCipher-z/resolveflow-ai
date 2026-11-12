@@ -1,20 +1,33 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let _client: SupabaseClient | null = null;
 
-if (!supabaseUrl || !serviceKey) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+function getClient(): SupabaseClient {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key';
+
+  if (!_client) {
+    _client = createClient(supabaseUrl, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+  }
+  return _client;
 }
 
 /**
  * Server-only Supabase client with service role key.
  * Used for server-side trusted DB operations (PayPal sync, migrations, audit logs).
+ * Uses lazy proxy initialization to prevent build-time crashes when env vars are missing.
  * Never expose to browser bundle.
  */
-export const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
+export const supabaseAdmin = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const client = getClient();
+    const val = (client as any)[prop];
+    return typeof val === 'function' ? val.bind(client) : val;
   },
 });
+
