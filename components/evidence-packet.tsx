@@ -9,8 +9,10 @@ import {
   Info,
   Lock,
   RefreshCw,
+  Send,
   Shield,
   Truck,
+  XCircle,
 } from 'lucide-react';
 import { ProvenanceBadge } from '@/components/provenance-badge';
 
@@ -75,6 +77,15 @@ export function EvidencePacket({ disputeId, paypalDisputeId }: EvidencePacketPro
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+
+  // Submit state
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitResult, setSubmitResult] = useState<{
+    success: boolean;
+    message: string;
+    submissionId?: string;
+  } | null>(null);
 
   async function loadVerifiedMatches() {
     setLoading(true);
@@ -158,6 +169,45 @@ export function EvidencePacket({ disputeId, paypalDisputeId }: EvidencePacketPro
       setPreviewError(e.message);
     } finally {
       setPreviewLoading(false);
+    }
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setSubmitResult(null);
+    try {
+      const payload = {
+        paypalDisputeId,
+        notes: notes.trim(),
+        documentIds: verifiedMatches.map((m) => m.documentId),
+      };
+      const res = await fetch(`/api/disputes/${disputeId}/evidence-packet/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSubmitResult({
+          success: true,
+          message: 'Evidence submitted successfully to PayPal Sandbox!',
+          submissionId: json.data.submissionId,
+        });
+        setShowConfirmModal(false);
+        // Reload to reflect reconciled state
+        loadVerifiedMatches();
+      } else {
+        setSubmitResult({
+          success: false,
+          message: json.error || 'Submission failed',
+        });
+        setShowConfirmModal(false);
+      }
+    } catch (e: any) {
+      setSubmitResult({ success: false, message: e.message });
+      setShowConfirmModal(false);
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -471,8 +521,98 @@ export function EvidencePacket({ disputeId, paypalDisputeId }: EvidencePacketPro
             <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-500" />
             <span>
               This preview shows the exact request that will be sent. No PayPal API call has been made.
-              Submission requires a separate explicit confirmation step (Stage C final).
+              Click &quot;Submit to PayPal Sandbox&quot; to send.
             </span>
+          </div>
+
+          {/* Submit button */}
+          <div className="flex items-center gap-3 pt-2 border-t border-blue-200">
+            <button
+              onClick={() => setShowConfirmModal(true)}
+              disabled={preview.warnings.some((w) => w.includes('NOT been HUMAN_VERIFIED')) || preview.attachedFiles.length === 0}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Submit to PayPal Sandbox
+            </button>
+            <span className="text-[10px] text-amber-700 font-medium">
+              ⚠ This will make a real API call to PayPal Sandbox.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Submit result */}
+      {submitResult && (
+        <div
+          className={`p-4 rounded-lg border text-xs flex items-start gap-2 ${
+            submitResult.success
+              ? 'bg-green-50 border-green-200 text-green-900'
+              : 'bg-red-50 border-red-200 text-red-900'
+          }`}
+        >
+          {submitResult.success ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-green-600" />
+          ) : (
+            <XCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+          )}
+          <div>
+            <p className="font-semibold">{submitResult.success ? 'Submission Successful' : 'Submission Failed'}</p>
+            <p className="mt-0.5">{submitResult.message}</p>
+            {submitResult.submissionId && (
+              <p className="mt-1 font-mono text-[10px] text-secondary">
+                Submission ID: {submitResult.submissionId}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <h3 className="font-bold text-sm text-foreground">Confirm Evidence Submission</h3>
+            </div>
+
+            <div className="space-y-2 text-xs text-secondary">
+              <p>
+                You are about to submit evidence to <strong>PayPal Sandbox</strong> for
+                dispute <strong className="font-mono">{paypalDisputeId}</strong>.
+              </p>
+              <p>
+                This will make a <strong>real API call</strong> to PayPal&apos;s Sandbox environment.
+                The dispute state will be re-fetched before submission to ensure the action is still allowed.
+              </p>
+              <div className="p-2 rounded bg-amber-50 border border-amber-200 text-amber-900">
+                <strong>Reminder:</strong> AI does not adjudicate. A tracking number does not prove delivery.
+                No claim of delivery has been made in the notes.
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                disabled={submitting}
+                className="px-4 py-2 text-xs font-medium text-secondary border border-border rounded-md hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-md shadow-sm disabled:opacity-50"
+              >
+                {submitting ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                {submitting ? 'Submitting…' : 'Confirm & Submit'}
+              </button>
+            </div>
           </div>
         </div>
       )}
