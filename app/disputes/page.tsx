@@ -12,6 +12,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { ProvenanceBadge } from '@/components/provenance-badge';
+import { DeadlineBadge } from '@/components/deadline-badge';
 import {
   formatDisputeReason,
   formatDisputeStatus,
@@ -219,16 +220,22 @@ export default function DisputeInboxPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         {dispute.seller_response_due_at ? (
-                          <div>
-                            <span className="text-foreground font-medium">
-                              {formatDateIST(dispute.seller_response_due_at)}
-                            </span>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-foreground font-medium">
+                                {formatDateIST(dispute.seller_response_due_at)}
+                              </span>
+                              <DeadlineBadge dueDate={dispute.seller_response_due_at} />
+                            </div>
                             <span className="block text-[10px] text-secondary">
                               {formatTimeIST(dispute.seller_response_due_at)}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-secondary italic">Not available</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-secondary italic">Not available</span>
+                            <DeadlineBadge dueDate={null} />
+                          </div>
                         )}
                       </td>
                       <td className="py-3.5 px-4">

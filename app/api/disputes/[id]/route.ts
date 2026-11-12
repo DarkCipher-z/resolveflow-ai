@@ -22,7 +22,7 @@ export async function GET(
         evidence_requirements (*),
         transactions (*),
         documents (*),
-        evidence_matches (*)
+        evidence_matches (*, ai_runs (*))
       `)
       .eq('organization_id', orgId);
 

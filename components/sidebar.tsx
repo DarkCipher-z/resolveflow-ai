@@ -60,13 +60,15 @@ export function Sidebar() {
       </div>
 
       {/* Merchant Context */}
-      <div className="px-4 py-3 border-b border-sidebar-border bg-[#0d162a]">
-        <div className="flex items-center justify-between">
-          <div className="truncate">
-            <p className="text-[10px] uppercase font-semibold text-sidebar-muted tracking-wider">Merchant Organization</p>
-            <p className="text-xs font-medium text-white truncate">Northstar Goods</p>
-          </div>
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+      <div className="px-4 py-3 border-b border-sidebar-border bg-[#0d162a] space-y-1.5">
+        <div>
+          <p className="text-[10px] uppercase font-semibold text-sidebar-muted tracking-wider">
+            Merchant Organization
+          </p>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-white truncate">Northstar Goods</p>
+          <span className="text-[9px] font-medium px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 whitespace-nowrap">
             Single-merchant mode
           </span>
         </div>

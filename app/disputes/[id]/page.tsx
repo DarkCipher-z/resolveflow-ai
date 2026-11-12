@@ -22,7 +22,9 @@ import {
   Info,
 } from 'lucide-react';
 import { ProvenanceBadge } from '@/components/provenance-badge';
+import { DeadlineBadge } from '@/components/deadline-badge';
 import { DocumentUpload } from '@/components/document-upload';
+import { EvidenceIntelligence } from '@/components/evidence-intelligence';
 import {
   formatDisputeReason,
   formatDisputeStatus,
@@ -209,12 +211,18 @@ export default function DisputeWorkspacePage({
 
                 <div>
                   <dt className="text-secondary font-medium">Response Deadline</dt>
-                  <dd className="mt-1 flex items-center gap-1.5 text-foreground font-medium">
-                    <Clock className="w-3.5 h-3.5 text-warning" />
+                  <dd className="mt-1 flex items-center gap-1.5 flex-wrap text-foreground font-medium">
+                    <Clock className="w-3.5 h-3.5 text-warning shrink-0" />
                     {dispute.seller_response_due_at ? (
-                      <span>{formatDateTimeIST(dispute.seller_response_due_at)}</span>
+                      <>
+                        <span>{formatDateTimeIST(dispute.seller_response_due_at)}</span>
+                        <DeadlineBadge dueDate={dispute.seller_response_due_at} />
+                      </>
                     ) : (
-                      <span className="text-secondary italic">Not available</span>
+                      <>
+                        <span className="text-secondary italic">Not available</span>
+                        <DeadlineBadge dueDate={null} />
+                      </>
                     )}
                   </dd>
                 </div>
@@ -252,60 +260,54 @@ export default function DisputeWorkspacePage({
                 <ProvenanceBadge origin="PAYPAL" />
               </div>
 
-              {snapshotTransactions.length > 0 ? (
-                <div className="space-y-3">
-                  {snapshotTransactions.map((tx: any, idx: number) => (
-                    <div key={idx} className="p-3 bg-slate-50 rounded-md border border-border text-xs space-y-2">
-                      <div>
-                        <span className="text-[10px] uppercase font-semibold text-secondary tracking-wider block">
-                          seller_transaction_id
-                        </span>
-                        <span className="font-mono font-bold text-foreground break-all">
-                          {tx.seller_transaction_id || '(not returned by API)'}
-                        </span>
-                      </div>
+              {(() => {
+                const txList = snapshotTransactions.length > 0
+                  ? snapshotTransactions
+                  : dbTransactions.map((t: any) => t.source_payload || t);
 
-                      <div>
-                        <span className="text-[10px] uppercase font-semibold text-secondary tracking-wider block">
-                          buyer_transaction_id
-                        </span>
-                        <span className="font-mono font-bold text-foreground break-all">
-                          {tx.buyer_transaction_id || '(not returned by API)'}
-                        </span>
-                      </div>
+                if (txList.length === 0) {
+                  return (
+                    <p className="text-xs text-secondary italic">
+                      No disputed transactions returned in snapshot.
+                    </p>
+                  );
+                }
 
-                      <div className="flex items-center justify-between text-secondary pt-1.5 border-t border-slate-200 text-[11px]">
-                        <span>
-                          Gross: <strong className="text-foreground">{tx.gross_amount?.currency_code || 'USD'} {tx.gross_amount?.value}</strong>
-                        </span>
-                        {tx.create_time && (
-                          <span>{formatDateIST(tx.create_time)}</span>
-                        )}
+                return (
+                  <div className="space-y-3">
+                    {txList.map((tx: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-slate-50 rounded-md border border-border text-xs space-y-2">
+                        <div>
+                          <span className="text-[10px] uppercase font-semibold text-secondary tracking-wider block">
+                            seller_transaction_id
+                          </span>
+                          <span className="font-mono font-bold text-foreground break-all">
+                            {tx.seller_transaction_id || tx.paypal_transaction_reference || '(not returned by API)'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] uppercase font-semibold text-secondary tracking-wider block">
+                            buyer_transaction_id
+                          </span>
+                          <span className="font-mono font-bold text-foreground break-all">
+                            {tx.buyer_transaction_id || '(not returned by API)'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-secondary pt-1.5 border-t border-slate-200 text-[11px]">
+                          <span>
+                            Gross: <strong className="text-foreground">{tx.gross_amount?.currency_code || tx.currency_code || 'USD'} {tx.gross_amount?.value || tx.amount}</strong>
+                          </span>
+                          {(tx.create_time || tx.transaction_at) && (
+                            <span>{formatDateIST(tx.create_time || tx.transaction_at)}</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : dbTransactions.length > 0 ? (
-                <div className="space-y-2">
-                  {dbTransactions.map((tx: any) => (
-                    <div key={tx.id} className="p-3 bg-slate-50 rounded-md border border-border text-xs">
-                      <span className="text-[10px] uppercase font-semibold text-secondary tracking-wider block">
-                        Transaction Reference
-                      </span>
-                      <p className="font-mono font-bold text-foreground break-all">
-                        {tx.paypal_transaction_reference}
-                      </p>
-                      <p className="text-secondary mt-1">
-                        Gross: <strong className="text-foreground">{tx.currency_code} {tx.amount}</strong>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-secondary italic">
-                  No disputed transactions returned in snapshot.
-                </p>
-              )}
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -423,11 +425,11 @@ export default function DisputeWorkspacePage({
 
                         {action.id === 'PROVIDE_EVIDENCE' ? (
                           <button
-                            disabled
-                            className="px-2 py-1 text-[10px] font-semibold text-white bg-primary rounded opacity-50 cursor-not-allowed"
-                            title="Phase 3: Submit human-approved evidence"
+                            onClick={() => setActiveTab('EVIDENCE')}
+                            className="px-2.5 py-1 text-[11px] font-semibold text-white bg-primary hover:bg-primary-hover rounded shadow-sm transition-colors cursor-pointer"
+                            title="Open evidence workspace to review or submit"
                           >
-                            Submit Evidence (Phase 3)
+                            Submit Evidence
                           </button>
                         ) : (
                           <span className="text-[10px] text-secondary italic">
@@ -455,44 +457,10 @@ export default function DisputeWorkspacePage({
         </div>
       )}
 
-      {/* TAB 2: EVIDENCE CHECKLIST & UPLOAD (Phase 2a) */}
+      {/* TAB 2: EVIDENCE CHECKLIST & UPLOAD (Phase 2) */}
       {activeTab === 'EVIDENCE' && (
         <div className="space-y-6">
-          {/* Requested Requirements Header */}
-          <div className="bg-white rounded-lg border border-border p-5 shadow-sm">
-            <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
-              <div>
-                <h2 className="font-semibold text-sm text-foreground flex items-center gap-2">
-                  <FileCheck className="w-4 h-4 text-primary" />
-                  <span>PayPal Evidence Requirements</span>
-                </h2>
-                <p className="text-xs text-secondary mt-0.5">
-                  Requirements requested by PayPal to challenge or resolve this dispute.
-                </p>
-              </div>
-              <ProvenanceBadge origin="PAYPAL" />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {requirements.map((req: any) => (
-                <div
-                  key={req.id}
-                  className="p-3 rounded border border-border bg-slate-50 flex items-center justify-between text-xs"
-                >
-                  <div>
-                    <p className="font-mono font-bold text-foreground">{req.paypal_evidence_type}</p>
-                    <p className="text-[11px] text-secondary">Source: {req.evidence_source}</p>
-                  </div>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                    {req.requirement_status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Secure Document Upload & Document Library (Phase 2a) */}
-          <DocumentUpload disputeId={dispute.id} />
+          <EvidenceIntelligence disputeId={dispute.id} onCoverageUpdated={loadDispute} />
         </div>
       )}
 
