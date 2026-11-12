@@ -42,11 +42,19 @@
 
 ## Verification Results
 - `npx tsc --noEmit`: **PASS** (0 errors)
+- `npm run build`: **PASS** (All 12 routes static/dynamic compiled successfully)
 - Database RLS and schema: 14 tables verified, all constraints intact.
 - Git hygiene: `.env` verified ignored and untracked.
+- Render Blueprint: `render.yaml` configured with Node 20.18.0 and environment mapping.
 - Sandbox dispute integrity:
   - `PP-R-YYP-10198826`: Evidence submitted and reconciled (`WAITING_FOR_BUYER_RESPONSE`).
   - `PP-R-XBK-10198832`: **RESERVED** for final demo, untouched (`WAITING_FOR_SELLER_RESPONSE`).
+
+---
+
+## Deployment
+- Production configuration: [`render.yaml`](./render.yaml)
+- Full step-by-step instructions: [`DEPLOYMENT.md`](./DEPLOYMENT.md)
 
 ---
 
