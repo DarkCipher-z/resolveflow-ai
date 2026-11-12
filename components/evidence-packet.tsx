@@ -40,12 +40,14 @@ interface VerifiedMatch {
 interface PreviewData {
   endpoint: string;
   method: string;
+  contentType: string;
   inputJson: any;
   attachedFiles: Array<{
     fieldName: string;
     originalFilename: string;
     mimeType: string;
     sizeBytes: number;
+    sha256Hash: string;
     documentId: string;
     provenance: string;
     reviewStatus: string;
@@ -410,6 +412,9 @@ export function EvidencePacket({ disputeId, paypalDisputeId }: EvidencePacketPro
             <div className="font-mono text-[11px] bg-slate-900 text-green-400 px-3 py-2 rounded break-all">
               {preview.method} {preview.endpoint}
             </div>
+            <div className="font-mono text-[10px] text-secondary">
+              Content-Type: {preview.contentType || 'multipart/form-data'}; boundary=&lt;auto&gt;
+            </div>
           </div>
 
           {/* Input JSON */}
@@ -434,19 +439,24 @@ export function EvidencePacket({ disputeId, paypalDisputeId }: EvidencePacketPro
                 {preview.attachedFiles.map((f, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-white border border-border text-[11px]"
+                    className="p-2.5 rounded-md bg-white border border-border text-[11px] space-y-1"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-secondary">{f.fieldName}</span>
-                      <FileText className="w-3 h-3 text-slate-400" />
-                      <span className="font-medium text-foreground">{f.originalFilename}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-secondary">{f.fieldName}</span>
+                        <FileText className="w-3 h-3 text-slate-400" />
+                        <span className="font-medium text-foreground">{f.originalFilename}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-secondary">{formatBytes(f.sizeBytes)}</span>
+                        <span className="font-mono text-secondary">{f.mimeType}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800 border border-green-200">
+                          {f.reviewStatus}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-secondary">{formatBytes(f.sizeBytes)}</span>
-                      <span className="font-mono text-secondary">{f.mimeType}</span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800 border border-green-200">
-                        {f.reviewStatus}
-                      </span>
+                    <div className="font-mono text-[9px] text-secondary truncate">
+                      SHA-256: {f.sha256Hash}
                     </div>
                   </div>
                 ))}

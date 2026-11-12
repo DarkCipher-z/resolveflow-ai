@@ -63,9 +63,24 @@ export async function POST(
     }
 
     // Build evidences array — group by evidence type
+    // Known PayPal carrier enum values (subset)
+    const KNOWN_CARRIERS: Record<string, string> = {
+      'FEDEX': 'FEDEX', 'FEDEX_GROUND': 'FEDEX', 'FEDEX_EXPRESS': 'FEDEX',
+      'UPS': 'UPS', 'UPS_GROUND': 'UPS', 'UPS_EXPRESS': 'UPS',
+      'USPS': 'USPS', 'DHL': 'DHL', 'DPD': 'DPD', 'TNT': 'TNT',
+      'ROYAL_MAIL': 'ROYAL_MAIL', 'CANADA_POST': 'CANADA_POST',
+      'AUSTRALIA_POST': 'AUSTRALIA_POST', 'ARAMEX': 'ARAMEX',
+    };
+
+    type TrackingEntry = {
+      carrier_name: string;
+      carrier_name_other?: string;
+      tracking_number: string;
+    };
+
     type EvidenceAccum = {
       evidence_type: string;
-      tracking_info: Array<{ carrier_name: string; tracking_number: string }>;
+      tracking_info: TrackingEntry[];
       notes: string;
       document_ids: string[];
     };
@@ -90,13 +105,17 @@ export async function POST(
       const carrier = aiOutput?.extracted_fields?.carrier;
       const tracking = aiOutput?.extracted_fields?.tracking_number;
       if (carrier && tracking) {
-        const carrierEnum = carrier.toUpperCase().replace(/\s+/g, '_');
-        entry.tracking_info.push({
-          carrier_name: ['FEDEX', 'UPS', 'USPS', 'DHL', 'DPD', 'TNT', 'OTHER'].includes(carrierEnum)
-            ? carrierEnum
-            : 'OTHER',
+        const carrierKey = carrier.toUpperCase().replace(/\s+/g, '_');
+        const mappedCarrier = KNOWN_CARRIERS[carrierKey];
+        const trackingEntry: TrackingEntry = {
+          carrier_name: mappedCarrier ?? 'OTHER',
           tracking_number: tracking,
-        });
+        };
+        // carrier_name_other is mandatory when carrier_name is OTHER
+        if (!mappedCarrier) {
+          trackingEntry.carrier_name_other = carrier; // preserve original name
+        }
+        entry.tracking_info.push(trackingEntry);
       }
     }
 
