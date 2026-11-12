@@ -34,12 +34,23 @@ export async function POST(
     const newReviewStatus = action === 'CONFIRM' ? 'HUMAN_VERIFIED' : 'REJECTED';
     const now = new Date().toISOString();
 
+    // Query the seeded demo owner's user_id from organization_members in single-merchant mode
+    const { data: member } = await supabaseAdmin
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', match.organization_id)
+      .eq('role', 'OWNER')
+      .limit(1)
+      .maybeSingle();
+
+    const reviewerUserId = member?.user_id || DEMO_USER_ID;
+
     // 2. Update evidence_matches row
     const { error: updateMatchError } = await supabaseAdmin
       .from('evidence_matches')
       .update({
         review_status: newReviewStatus,
-        reviewed_by: DEMO_USER_ID,
+        reviewed_by: reviewerUserId,
         reviewed_at: now,
       })
       .eq('id', matchId);
@@ -82,10 +93,10 @@ export async function POST(
         .eq('id', reqId);
     }
 
-    // 4. Record audit log
+    // 4. Record audit log (USER actor_type is strictly for browser actions)
     await supabaseAdmin.from('audit_logs').insert({
       organization_id: match.organization_id,
-      actor_user_id: DEMO_USER_ID,
+      actor_user_id: reviewerUserId,
       actor_type: 'USER',
       action_type: action === 'CONFIRM' ? 'EVIDENCE_MATCH_CONFIRMED' : 'EVIDENCE_MATCH_REJECTED',
       entity_type: 'evidence_matches',
@@ -95,7 +106,7 @@ export async function POST(
       },
       new_value: {
         review_status: newReviewStatus,
-        reviewed_by: DEMO_USER_ID,
+        reviewed_by: reviewerUserId,
         reviewed_at: now,
         action,
       },

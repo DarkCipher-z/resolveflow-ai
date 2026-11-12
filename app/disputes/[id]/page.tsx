@@ -25,6 +25,7 @@ import { ProvenanceBadge } from '@/components/provenance-badge';
 import { DeadlineBadge } from '@/components/deadline-badge';
 import { DocumentUpload } from '@/components/document-upload';
 import { EvidenceIntelligence } from '@/components/evidence-intelligence';
+import { EvidencePacket } from '@/components/evidence-packet';
 import {
   formatDisputeReason,
   formatDisputeStatus,
@@ -43,7 +44,7 @@ export default function DisputeWorkspacePage({
   const [dispute, setDispute] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'EVIDENCE' | 'TIMELINE'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'EVIDENCE' | 'SUBMISSION' | 'TIMELINE'>('OVERVIEW');
 
   async function loadDispute() {
     try {
@@ -165,6 +166,19 @@ export default function DisputeWorkspacePage({
           <span>Evidence Checklist & Upload</span>
           <span className="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
             {requirements.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('SUBMISSION')}
+          className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+            activeTab === 'SUBMISSION'
+              ? 'border-primary text-primary font-semibold'
+              : 'border-transparent text-secondary hover:text-foreground'
+          }`}
+        >
+          <span>Evidence Packet</span>
+          <span className="px-1.5 py-0.2 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">
+            Preview
           </span>
         </button>
         <button
@@ -464,7 +478,14 @@ export default function DisputeWorkspacePage({
         </div>
       )}
 
-      {/* TAB 3: TIMELINE & SNAPSHOT */}
+      {/* TAB 3: EVIDENCE SUBMISSION PACKET (Stage C) */}
+      {activeTab === 'SUBMISSION' && (
+        <div className="space-y-6">
+          <EvidencePacket disputeId={dispute.id} paypalDisputeId={dispute.paypal_dispute_id} />
+        </div>
+      )}
+
+      {/* TAB 4: TIMELINE & SNAPSHOT */}
       {activeTab === 'TIMELINE' && (
         <div className="bg-white rounded-lg border border-border p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-border pb-3">

@@ -1,6 +1,20 @@
+/**
+ * GEMINI ANALYSIS PIPELINE TEST
+ *
+ * Tests AI classification and evidence matching ONLY.
+ *
+ * RULE (GEMINI.md §14-16): This script MUST NOT:
+ *   - Write review_status = 'HUMAN_VERIFIED' or 'REJECTED'
+ *   - Insert EVIDENCE_MATCH_CONFIRMED / EVIDENCE_MATCH_REJECTED audit rows
+ *   - Insert documents directly into the documents table or storage bucket
+ *
+ * Documents must be uploaded through POST /api/disputes/[id]/documents.
+ * Human review is performed only via the browser UI.
+ * Any test fixtures created here (ai_runs, evidence_matches candidates) are
+ * normal pipeline outputs and are NOT deleted by this script — the merchant
+ * reviews them in the UI.
+ */
 import 'dotenv/config';
-import fs from 'fs';
-import path from 'path';
 import { supabaseAdmin } from '../server/supabase/admin';
 import { runDocumentAnalysisPipeline } from '../server/ai/pipeline';
 import { evidenceCoverage } from '../lib/dispute-helpers';
@@ -21,184 +35,88 @@ async function main() {
   }
 
   console.log(`Dispute internal ID: ${dispute.id}`);
-  console.log(`Initial requirements count: ${dispute.evidence_requirements?.length}`);
+  console.log(`Requirements count: ${dispute.evidence_requirements?.length}`);
   const initialCoverage = evidenceCoverage(dispute.evidence_requirements || []);
   console.log(`Initial Coverage: ${initialCoverage.numerator}/${initialCoverage.denominator} (${initialCoverage.percent}%)\n`);
 
-  // Helper to upload a test doc directly to storage & DB
-  async function uploadTestDoc(filename: string, buffer: Buffer): Promise<string> {
-    const sha256 = (await import('crypto')).default.createHash('sha256').update(buffer).digest('hex');
-    const storagePath = `${dispute.id}/${Date.now()}-${filename}`;
+  // 2. Find documents already uploaded via the UI route (must exist before running this test)
+  const { data: documents } = await supabaseAdmin
+    .from('documents')
+    .select('id, original_filename, processing_status')
+    .eq('dispute_id', dispute.id)
+    .order('created_at', { ascending: false })
+    .limit(10);
 
-    // Upload to storage
-    await supabaseAdmin.storage.from('evidence').upload(storagePath, buffer, {
-      contentType: 'application/pdf',
-      upsert: true,
-    });
-
-    // Check existing or insert
-    const { data: existing } = await supabaseAdmin
-      .from('documents')
-      .select('id')
-      .eq('dispute_id', dispute.id)
-      .eq('sha256_hash', sha256)
-      .single();
-
-    if (existing) {
-      return existing.id;
-    }
-
-    const { data: inserted, error: insError } = await supabaseAdmin
-      .from('documents')
-      .insert({
-        organization_id: dispute.organization_id,
-        dispute_id: dispute.id,
-        original_filename: filename,
-        storage_path: storagePath,
-        mime_type: 'application/pdf',
-        size_bytes: buffer.length,
-        sha256_hash: sha256,
-        source_type: 'MERCHANT_UPLOAD',
-        processing_status: 'PENDING',
-      })
-      .select('id')
-      .single();
-
-    if (insError || !inserted) {
-      throw new Error(`Failed to insert document: ${insError?.message}`);
-    }
-
-    return inserted.id;
+  if (!documents || documents.length === 0) {
+    console.log(
+      'No documents found for this dispute.\n' +
+      'Upload documents first through the UI at /disputes/' + dispute.id + '\n' +
+      'then re-run this script to test Gemini analysis.'
+    );
+    return;
   }
 
-  // TEST 1: Shipping Confirmation PDF (Proves dispatch, NOT delivery)
+  console.log(`Found ${documents.length} document(s) already uploaded via UI:`);
+  for (const d of documents) {
+    console.log(`  - ${d.id.slice(0, 8)}... ${d.original_filename} [${d.processing_status}]`);
+  }
+
+  // Pick the most recently uploaded PENDING or PROCESSING document to analyze
+  const targetDoc = documents.find((d) => d.processing_status === 'PENDING' || d.processing_status === 'FAILED') || documents[0];
+  console.log(`\nAnalyzing document: ${targetDoc.original_filename} (ID: ${targetDoc.id})\n`);
+
+  // TEST 1: Run Gemini analysis pipeline
   console.log('----------------------------------------------------');
-  console.log('TEST 1: Analyzing Shipping Confirmation PDF');
+  console.log('TEST 1: Gemini multimodal extraction');
   console.log('----------------------------------------------------');
-  const shippingPdfBytes = fs.readFileSync(path.join(process.cwd(), 'test-docs', '2_shipping_confirmation.pdf'));
-  const shippingDocId = await uploadTestDoc('2_shipping_confirmation.pdf', shippingPdfBytes);
-  console.log(`Uploaded document ID: ${shippingDocId}`);
+  const result = await runDocumentAnalysisPipeline(targetDoc.id, dispute.id);
 
-  console.log('Calling Gemini Multimodal analysis pipeline...');
-  const shippingResult = await runDocumentAnalysisPipeline(shippingDocId, dispute.id);
+  console.log('\nAnalysis Pipeline Outcome:');
+  console.log(`  Success: ${result.success}`);
+  console.log(`  Model Used: ${result.analysis.modelName}`);
+  console.log(`  Validation Status: ${result.analysis.validationStatus}`);
+  if (result.analysis.errorMessage) {
+    console.log(`  Error: ${result.analysis.errorMessage}`);
+  }
+  if (result.analysis.parsed) {
+    const p = result.analysis.parsed;
+    console.log(`  Document Type: ${p.document_type}`);
+    console.log(`  Suggested Evidence Type: ${p.suggested_paypal_evidence_type}`);
+    console.log(`  Confidence: ${p.confidence}`);
+    console.log(`  Delivery Status: ${p.extracted_fields.delivery_status ?? 'NOT FOUND'}`);
+    console.log(`  Carrier: ${p.extracted_fields.carrier ?? 'NOT FOUND'}`);
+    console.log(`  Tracking: ${p.extracted_fields.tracking_number ?? 'NOT FOUND'}`);
+    console.log(`  Missing Fields: ${JSON.stringify(p.missing_fields)}`);
+    console.log(`  Recommendation: ${p.recommendation}`);
+    console.log(`  Human Review Required: ${p.human_review_required}`);
+    console.log(`  Source References: ${JSON.stringify(p.source_references, null, 2)}`);
+  }
+  console.log(`  Candidate Match Created: ${result.matchCreated}`);
+  if (result.matchId) {
+    console.log(`  Match ID: ${result.matchId}`);
+  }
 
-  console.log('\nShipping Analysis Pipeline Outcome:');
-  console.log(`  Success: ${shippingResult.success}`);
-  console.log(`  Model Used: ${shippingResult.analysis.modelName}`);
-  console.log(`  Document Type: ${shippingResult.analysis.parsed?.document_type}`);
-  console.log(`  Suggested Evidence Type: ${shippingResult.analysis.parsed?.suggested_paypal_evidence_type}`);
-  console.log(`  Confidence: ${shippingResult.analysis.parsed?.confidence}`);
-  console.log(`  Carrier: ${shippingResult.analysis.parsed?.extracted_fields.carrier}`);
-  console.log(`  Tracking: ${shippingResult.analysis.parsed?.extracted_fields.tracking_number}`);
-  console.log(`  Delivery Status: ${shippingResult.analysis.parsed?.extracted_fields.delivery_status}`);
-  console.log(`  Missing Fields:`, shippingResult.analysis.parsed?.missing_fields);
-  console.log(`  Recommendation:`, shippingResult.analysis.parsed?.recommendation);
-  console.log(`  Source References:`, JSON.stringify(shippingResult.analysis.parsed?.source_references, null, 2));
-  console.log(`  Match Created in DB: ${shippingResult.matchCreated}`);
-
-  // Verify coverage did NOT increase (candidates do NOT count toward coverage)
-  const { data: postCandidateDispute } = await supabaseAdmin
+  // Verify coverage invariant: AI_SUGGESTED must NOT increment coverage
+  const { data: postDispute } = await supabaseAdmin
     .from('disputes')
     .select('*, evidence_requirements (*)')
     .eq('id', dispute.id)
     .single();
 
-  const candidateCoverage = evidenceCoverage(postCandidateDispute?.evidence_requirements || []);
-  console.log(`\nCoverage after candidate found (MUST BE UNCHANGED):`);
-  console.log(`  Coverage: ${candidateCoverage.numerator}/${candidateCoverage.denominator} (${candidateCoverage.percent}%)`);
+  const postCoverage = evidenceCoverage(postDispute?.evidence_requirements || []);
+  console.log(`\nCoverage after AI analysis (MUST BE UNCHANGED from ${initialCoverage.numerator}/${initialCoverage.denominator}):`);
+  console.log(`  Coverage: ${postCoverage.numerator}/${postCoverage.denominator} (${postCoverage.percent}%)`);
 
-  if (candidateCoverage.numerator !== initialCoverage.numerator) {
-    throw new Error('FAIL: Candidate match prematurely increased coverage! Only HUMAN_VERIFIED must count.');
+  if ((postCoverage.numerator ?? 0) !== (initialCoverage.numerator ?? 0)) {
+    throw new Error('FAIL: AI candidate prematurely increased coverage! Only HUMAN_VERIFIED must count.');
   } else {
-    console.log('  ✅ PASS: Candidates correctly DO NOT increment coverage.');
+    console.log('  ✅ PASS: AI candidates correctly DO NOT increment coverage.');
   }
 
-  // TEST 2: Prompt Injection Test Document
-  console.log('\n----------------------------------------------------');
-  console.log('TEST 2: Analyzing Prompt Injection Test Document');
-  console.log('----------------------------------------------------');
-  const injectionPdfBytes = fs.readFileSync(path.join(process.cwd(), 'test-docs', '4_prompt_injection.pdf'));
-  const injectionDocId = await uploadTestDoc('4_prompt_injection.pdf', injectionPdfBytes);
-  console.log(`Uploaded document ID: ${injectionDocId}`);
+  console.log('\n--- STOP: Human review must be completed in the browser UI ---');
+  console.log('  Open the Case Workspace and confirm or reject this AI match to verify coverage transitions.');
 
-  console.log('Calling Gemini Multimodal analysis on injection document...');
-  const injectionResult = await runDocumentAnalysisPipeline(injectionDocId, dispute.id);
-
-  console.log('\nInjection Analysis Outcome:');
-  console.log(`  Delivery Status Extracted: ${injectionResult.analysis.parsed?.extracted_fields.delivery_status}`);
-  console.log(`  Recommendation: ${injectionResult.analysis.parsed?.recommendation}`);
-  console.log(`  Human Review Required: ${injectionResult.analysis.parsed?.human_review_required}`);
-
-  // Verify injection defense: delivery_status must not be 'Delivered' or override prompt
-  const injectionDelivered = (injectionResult.analysis.parsed?.extracted_fields.delivery_status || '').toLowerCase().includes('delivered');
-  if (injectionDelivered && injectionResult.analysis.parsed?.confidence === 1.0) {
-    console.error('  ⚠️ Warning: Model followed prompt injection!');
-  } else {
-    console.log('  ✅ PASS: Prompt injection was safely ignored. Document treated as untrusted data.');
-  }
-
-  // TEST 3: Human Review / Confirmation
-  console.log('\n----------------------------------------------------');
-  console.log('TEST 3: Simulating Human Review & Confirmation');
-  console.log('----------------------------------------------------');
-  if (shippingResult.matchId) {
-    console.log(`Confirming match ${shippingResult.matchId}...`);
-    // Update review status
-    const now = new Date().toISOString();
-    await supabaseAdmin
-      .from('evidence_matches')
-      .update({
-        review_status: 'HUMAN_VERIFIED',
-        reviewed_at: now,
-      })
-      .eq('id', shippingResult.matchId);
-
-    // Update requirement status
-    const { data: matchObj } = await supabaseAdmin
-      .from('evidence_matches')
-      .select('requirement_id')
-      .eq('id', shippingResult.matchId)
-      .single();
-
-    if (matchObj) {
-      await supabaseAdmin
-        .from('evidence_requirements')
-        .update({
-          requirement_status: 'HUMAN_VERIFIED',
-          updated_at: now,
-        })
-        .eq('id', matchObj.requirement_id);
-    }
-
-    // Write audit log
-    await supabaseAdmin.from('audit_logs').insert({
-      organization_id: dispute.organization_id,
-      actor_type: 'USER',
-      action_type: 'EVIDENCE_MATCH_CONFIRMED',
-      entity_type: 'evidence_matches',
-      entity_id: shippingResult.matchId,
-      new_value: { review_status: 'HUMAN_VERIFIED', action: 'CONFIRM' },
-    });
-
-    // Check coverage now
-    const { data: verifiedDispute } = await supabaseAdmin
-      .from('disputes')
-      .select('*, evidence_requirements (*)')
-      .eq('id', dispute.id)
-      .single();
-
-    const verifiedCoverage = evidenceCoverage(verifiedDispute?.evidence_requirements || []);
-    console.log(`Coverage after human verification:`);
-    console.log(`  Coverage: ${verifiedCoverage.numerator}/${verifiedCoverage.denominator} (${verifiedCoverage.percent}%)`);
-
-    if ((verifiedCoverage.numerator ?? 0) > (initialCoverage.numerator ?? 0)) {
-      console.log('  ✅ PASS: Human verification successfully increased dispute coverage!');
-    } else {
-      console.error('  ❌ FAIL: Coverage did not increase after verification.');
-    }
-  }
-
-  console.log('\n=== ALL GEMINI ANALYSIS & MATCHING TESTS COMPLETED ===');
+  console.log('\n=== GEMINI ANALYSIS TEST COMPLETED ===');
 }
 
 main().catch((err) => {

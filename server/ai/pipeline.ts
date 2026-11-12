@@ -140,7 +140,6 @@ export async function runDocumentAnalysisPipeline(
       const excerpt = topSource?.excerpt || parsed.recommendation || '';
       const pageNumber = topSource?.page ?? 1;
 
-      // Upsert candidate match
       const { data: matchRow, error: matchError } = await supabaseAdmin
         .from('evidence_matches')
         .insert({

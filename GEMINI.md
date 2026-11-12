@@ -25,5 +25,10 @@ Spec: RESOLVEFLOW_SPEC.md (read it fully before acting).
 - Every task ends with: run it, show verification output, update BUILD_STATUS.md.
 - Windows environment: use PowerShell-compatible commands in any instructions to the user.
 
+## Test script rules (non-negotiable)
+14. Test scripts MUST NEVER write `review_status = 'HUMAN_VERIFIED'` or `'REJECTED'`, or insert `EVIDENCE_MATCH_CONFIRMED` / `EVIDENCE_MATCH_REJECTED` audit rows, into the real database. Those actions are browser-only, performed by a human via the UI.
+15. Test scripts MUST NEVER insert documents directly into the `documents` table or upload directly to the `evidence` storage bucket. Documents must go through `POST /api/disputes/[id]/documents`. When a script needs test fixtures it must label them with `DEMO_FIXTURE` and delete them on completion.
+16. The actor_type `USER` and `actor_user_id` in `audit_logs` must only be set by real API routes triggered from the browser. Scripts use `actor_type: 'SYSTEM'` for any administrative fixture cleanup they must perform.
+
 ## Verification habit
 After each slice: npx tsc --noEmit, lint, run the relevant script/test, and for UI open the page in the Browser agent and capture a screenshot.
